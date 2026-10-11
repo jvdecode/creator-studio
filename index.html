@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8"><title>Creator Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#faf8f5;--card:#fff;--tx:#1d1b19;--mu:#6f6a64;--bd:#e7e2db;--ac:#e8590c;--ac2:#fff1e8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161412;--card:#201d1a;--tx:#f3efe9;--mu:#a59e95;--bd:#34302b;--ac:#ff8a4c;--ac2:#2e211a}}
+:root[data-theme="dark"]{--bg:#161412;--card:#201d1a;--tx:#f3efe9;--mu:#a59e95;--bd:#34302b;--ac:#ff8a4c;--ac2:#2e211a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.w{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:8px 0 2px}h1 span{color:var(--ac)}
+.sub{color:var(--mu);margin:0 0 16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:11px}
+.row{display:flex;gap:10px}.row>div{flex:1}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:9px 14px}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600;width:100%;padding:13px;margin-top:14px}
+button:disabled{opacity:.6}
+.h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.h b{font-size:16px}.cp{padding:5px 11px;font-size:13px;background:var(--ac2);border-color:transparent;color:var(--ac)}
+pre{white-space:pre-wrap;word-wrap:break-word;margin:0;font:inherit}
+.sx{overflow-x:auto}table{border-collapse:collapse;min-width:640px;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--bd);padding:8px;text-align:left;vertical-align:top}th{color:var(--mu);font-weight:600}
+ol,ul{margin:0;padding-left:20px}li{margin:4px 0}
+.tags{display:flex;flex-wrap:wrap;gap:6px}.tags span{background:var(--ac2);color:var(--ac);border-radius:99px;padding:3px 10px;font-size:13px}
+.hi{padding:10px;border:1px solid var(--bd);border-radius:10px;margin-top:8px;cursor:pointer}.hi small{color:var(--mu)}
+.err{color:#c92a2a}.mu{color:var(--mu);font-size:14px}
+.top{display:flex;gap:8px;margin-top:10px}.top button{flex:1}
+</style></head><body><div class="w">
+<h1>Creator <span>Studio</span></h1>
+<p class="sub">Bas topic daalo — script, timeline, B-roll, title aur thumbnail ek saath.</p>
+
+<div class="card">
+ <label for="t">Topic *</label>
+ <input id="t" placeholder="e.g. Ladko ko bhi freedom chahiye">
+ <label for="n">Niche (optional)</label>
+ <input id="n" placeholder="e.g. motivation, humor, finance">
+ <div class="row">
+  <div><label for="l">Video length</label><select id="l"><option>15</option><option selected>30</option><option>60</option></select></div>
+  <div><label for="s">Script likhai</label><select id="s"><option value="Roman Hindi (Hinglish)">Roman</option><option value="Devanagari Hindi">देवनागरी</option></select></div>
+ </div>
+ <button class="p" id="go">Generate</button>
+ <div id="st" class="mu" style="margin-top:8px"></div>
+</div>
+
+<div id="out"></div>
+
+<div class="card">
+ <div class="h"><b>History</b><button class="cp" id="clr">Clear</button></div>
+ <div id="hist" class="mu">Abhi koi history nahi.</div>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const KEY="creator-studio-history";
+let hist=[],cur=null;
+try{hist=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){hist=[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(hist.slice(0,20)))}catch(e){}}
+function el(tag,txt,cls){const e=document.createElement(tag);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
+
+
+function build(){
+ const t=$("t").value.trim();if(!t){$("st").textContent="Pehle topic likho.";$("st").className="err";return null}
+ return{topic:t,niche:$("n").value.trim(),len:$("l").value,style:$("s").value}
+}
+async function run(inp){
+ const b=$("go");b.disabled=true;$("st").className="mu";$("st").textContent="Bana raha hu...";
+ try{
+  const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(inp)});
+  const r=await res.json();
+  if(!res.ok)throw {message:r.error||"Server error"};
+  const item={id:Date.now(),inp,r,at:new Date().toLocaleString()};
+  cur=item;hist.unshift(item);hist=hist.slice(0,20);save();show(item);renderHist();
+  $("st").textContent="";
+ }catch(e){$("st").className="err";$("st").textContent="Error: "+(e&&e.message||"kuch gadbad hui")+" — dobara try karo."}
+ b.disabled=false;
+}
+async function copy(txt,btn){
+ try{await navigator.clipboard.writeText(txt)}catch(e){const a=document.createElement("textarea");a.value=txt;document.body.appendChild(a);a.select();try{document.execCommand("copy")}catch(_){}a.remove()}
+ const o=btn.textContent;btn.textContent="Copied ✓";setTimeout(()=>btn.textContent=o,1200);
+}
+function sec(title,txt,body){
+ const c=el("div",null,"card"),h=el("div",null,"h");h.append(el("b",title));
+ const b=el("button","Copy","cp");b.onclick=()=>copy(txt,b);h.append(b);c.append(h,body);return c;
+}
+function show(it){
+ const r=it.r,o=$("out");o.textContent="";
+ const top=el("div",null,"top");
+ const rg=el("button","🔄 Regenerate");rg.onclick=()=>run(it.inp);
+ const cl=el("button","📋 Copy all");
+ top.append(rg,cl);o.append(top);
+ const tl=r.timeline||[];
+ const tlTxt=tl.map(s=>`${s.time} | ${s.spoken} | ${s.onscreen} | ${s.edit}`).join("\n");
+ const brTxt=tl.map(s=>`${s.time}: ${s.broll}`).join("\n\n");
+ const th=r.thumbnail||{};
+ const thTxt=`Text: ${th.text}\nVisual: ${th.visual}\nPrompt: ${th.prompt}`;
+ const titles=(r.titles||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");
+ const tags=(r.tags||[]).join(" ");
+ cl.onclick=()=>copy([`SCRIPT\n${r.script}`,`TIMELINE\n${tlTxt}`,`B-ROLL\n${brTxt}`,`TITLES\n${titles}`,`CAPTION\n${r.caption}`,`TAGS\n${tags}`,`THUMBNAIL\n${thTxt}`].join("\n\n"),cl);
+ o.append(sec("1. Script",r.script||"",el("pre",r.script||"")));
+ const sx=el("div",null,"sx"),tb=el("table"),hd=el("tr");
+ ["Time","Spoken","On-screen","Edit"].forEach(x=>hd.append(el("th",x)));tb.append(hd);
+ tl.forEach(s=>{const tr=el("tr");[s.time,s.spoken,s.onscreen,s.edit].forEach(x=>tr.append(el("td",x)));tb.append(tr)});
+ sx.append(tb);o.append(sec("2. Editing timeline",tlTxt,sx));
+ const ol=el("ul");tl.forEach(s=>{const li=el("li");li.append(el("b",s.time+": "),document.createTextNode(s.broll||""));ol.append(li)});
+ o.append(sec("3. B-roll prompts",brTxt,ol));
+ const tt=el("ol");(r.titles||[]).forEach(x=>tt.append(el("li",x)));
+ o.append(sec("4a. Titles",titles,tt));
+ o.append(sec("4b. Caption",r.caption||"",el("pre",r.caption||"")));
+ const tg=el("div",null,"tags");(r.tags||[]).forEach(x=>tg.append(el("span",x)));
+ o.append(sec("4c. Tags",tags,tg));
+ const tb2=el("div");
+ [["Text",th.text],["Visual idea",th.visual],["Image prompt",th.prompt]].forEach(([k,v])=>{const p=el("p");p.append(el("b",k+": "),document.createTextNode(v||""));tb2.append(p)});
+ o.append(sec("5. Thumbnail",thTxt,tb2));
+ o.scrollIntoView({behavior:"smooth"});
+}
+function renderHist(){
+ const h=$("hist");h.textContent="";
+ if(!hist.length){h.textContent="Abhi koi history nahi.";return}
+ hist.forEach(it=>{const d=el("div",null,"hi");d.append(el("b",it.inp.topic),el("br"),el("small",`${it.inp.len}s · ${it.inp.niche||"general"} · ${it.at}`));
+  d.onclick=()=>{cur=it;$("t").value=it.inp.topic;$("n").value=it.inp.niche;$("l").value=it.inp.len;$("s").value=it.inp.style;show(it)};h.append(d)});
+}
+$("go").onclick=()=>{const i=build();if(i)run(i)};
+$("clr").onclick=()=>{hist=[];save();renderHist()};
+renderHist();
+</script></body></html>
